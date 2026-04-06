@@ -1,38 +1,47 @@
-name: CI-CD
+name: CI-CD Pipeline
 
 on:
   push:
     branches: [main]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: k8s
+  EKS_CLUSTER: my-cluster
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
 
     - name: Configure AWS
       uses: aws-actions/configure-aws-credentials@v2
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1
+        aws-region: ${{ env.AWS_REGION }}
 
     - name: Login to ECR
       run: |
-        aws ecr get-login-password --region us-east-1 \
-        | docker login --username AWS --password-stdin <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
+        aws ecr get-login-password --region $AWS_REGION \
+        | docker login --username AWS --password-stdin 155495620578.dkr.ecr.us-east-1.amazonaws.com
 
-    - name: Build Image
+    - name: Build Docker Image
       run: docker build -t k8s .
 
     - name: Tag Image
-      run: docker tag myapp:latest <ECR-URL>/k8s:latest
+      run: docker tag k8s:latest 155495620578.dkr.ecr.us-east-1.amazonaws.com/k8s:latest
 
     - name: Push Image
-      run: docker push <ECR-URL>/k8s:latest
+      run: docker push 155495620578.dkr.ecr.us-east-1.amazonaws.com/k8s:latest
 
-    - name: Deploy to EKS
+    - name: Update kubeconfig
+      run: aws eks --region $AWS_REGION update-kubeconfig --name $EKS_CLUSTER
+
+    - name: Deploy to Kubernetes
       run: |
         kubectl apply -f deployment.yaml
         kubectl apply -f service.yaml
